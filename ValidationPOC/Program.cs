@@ -1,11 +1,36 @@
-using ValidationPOC;
+
+using Microsoft.EntityFrameworkCore;
+using ValidationPOC.Configuration;
+using ValidationPOC.Endpoints;
+using ValidationPOC.Handlers;
+using ValidationPOC.Persistence;
+using ValidationPOC.Persistence.Repositories;
+using ValidationPOC.Persistence.UnitOfWork;
 
 var builder = WebApplication.CreateBuilder(args);
+var services = builder.Services;
+
+// Add Services
+services.AddScoped<IAddBookHandler, AddBookHandler>();
+services.AddScoped<IEditBookHandler, EditBookHandler>();
+
+services.AddScoped<IBookRepository, BookRepository>();
+
+services.AddScoped<IBookRequestRepository, BookRequestRepository>();
+
+services.AddScoped<IUnitOfWork, UnitOfWork<ApplicationDbContext>>();
+
+services.AddScoped<IBookCountRepository, BookCountRepository>();
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("ConcurrencyDatabase")));
+
+services.AddEndpointsApiExplorer();
+services.AddSwaggerGen();
+
+services.ConfigureHttpJsonOptions();
 
 var app = builder.Build();
 
@@ -16,34 +41,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-    {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("GetWeatherForecast")
-    .WithOpenApi();
+app.MapBookEndpoints();
 
 app.Run();
-
-namespace ValidationPOC
-{
-    record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-    {
-        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-    }
-}
